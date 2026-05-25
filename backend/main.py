@@ -10,7 +10,7 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # GROQ
 client = Groq(
-    api_key=os.getenv("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")
+    api_key=os.getenv("GROQ_API_KEY")
 )
 
 # simple memory db
