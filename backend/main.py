@@ -1,65 +1,32 @@
 from fastapi import FastAPI, UploadFile, File
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-
+from groq import Groq
 import fitz
 import os
-import faiss
-import numpy as np
-
-from sentence_transformers import SentenceTransformer
-from groq import Groq
-
-# =========================
-# CONFIG
-# =========================
-
-import os
-
-GROQ_API_KEY = os.getenv("VUUurQyfdiSHxBLMbYooWGdyb3FYGdZQm14xhQ3vDkZJJv01jx5o")
 
 app = FastAPI()
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 UPLOAD_DIR = "storage"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-model = SentenceTransformer("all-MiniLM-L6-v2")
+# GROQ
+client = Groq(
+    api_key=os.getenv("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")
+)
 
+# simple memory db
 db = {}
-
-# =========================
-# MODELS
-# =========================
-
-class ChatRequest(BaseModel):
-    filename: str
-    question: str
-
-# =========================
-# HOME
-# =========================
 
 @app.get("/")
 def home():
-    return {"status": "PDF AI ONLINE 🚀"}
+    return {"status": "Bubbz AI ONLINE 🚀"}
 
-# =========================
-# UPLOAD
-# =========================
-
+# ========================
+# PDF UPLOAD
+# ========================
 @app.post("/upload")
 async def upload_pdf(file: UploadFile = File(...)):
 
     try:
-
         path = f"{UPLOAD_DIR}/{file.filename}"
 
         with open(path, "wb") as f:
@@ -67,90 +34,59 @@ async def upload_pdf(file: UploadFile = File(...)):
 
         doc = fitz.open(path)
 
-        texts = []
+        full_text = ""
 
         for page in doc:
+            page_text = page.get_text()
 
-            text = page.get_text()
+            if page_text:
+                full_text += page_text + "\n"
 
-            if text.strip():
-                texts.append(text)
+        if not full_text.strip():
+            return {"error": "PDF contains no readable text"}
 
-        embeddings = model.encode(texts)
-
-        embeddings = np.array(
-            embeddings
-        ).astype("float32")
-
-        index = faiss.IndexFlatL2(
-            embeddings.shape[1]
-        )
-
-        index.add(embeddings)
-
-        db[file.filename] = {
-            "texts": texts,
-            "index": index
-        }
+        db[file.filename] = full_text
 
         return {
-            "message": "PDF processado",
+            "message": "PDF uploaded successfully 🚀",
             "filename": file.filename
         }
 
     except Exception as e:
-        return {
-            "error": str(e)
-        }
+        return {"error": str(e)}
 
-# =========================
+# ========================
 # CHAT
-# =========================
-
+# ========================
 @app.post("/chat")
-def chat(data: ChatRequest):
+def chat(data: dict):
 
     try:
+        filename = data.get("filename")
+        question = data.get("question")
 
-        if data.filename not in db:
-            return {
-                "error": "PDF não encontrado"
-            }
+        if filename not in db:
+            return {"error": "PDF not found"}
 
-        pdf_data = db[data.filename]
-
-        query_embedding = model.encode(
-            [data.question]
-        )
-
-        query_embedding = np.array(
-            query_embedding
-        ).astype("float32")
-
-        D, I = pdf_data["index"].search(
-            query_embedding,
-            k=3
-        )
-
-        context = "\n\n".join([
-            pdf_data["texts"][i]
-            for i in I[0]
-        ])
+        context = db[filename][:12000]
 
         prompt = f"""
-Responda usando apenas o contexto abaixo.
+You are an AI assistant that answers questions
+using only the uploaded PDF content.
 
-CONTEXTO:
+PDF Content:
 {context}
 
-PERGUNTA:
-{data.question}
+Question:
+{question}
 
-RESPOSTA:
+If the answer is not in the document,
+reply exactly with:
+"Not found in document."
 """
 
         completion = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="llama3-8b-8192",
             messages=[
                 {
                     "role": "user",
@@ -161,11 +97,7 @@ RESPOSTA:
 
         answer = completion.choices[0].message.content
 
-        return {
-            "answer": answer
-        }
+        return {"answer": answer}
 
     except Exception as e:
-        return {
-            "error": str(e)
-        }
+        return {"error": str(e)}

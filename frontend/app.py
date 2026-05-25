@@ -1,100 +1,113 @@
 import streamlit as st
 import requests
+import os
 
-API_URL = "http://127.0.0.1:8000"
+# ========================
+# API URL
+# ========================
 
-st.title("📄 Bubbz - PDF AI Chat")
+API_URL = os.getenv(
+    "API_URL",
+    "http://127.0.0.1:8000"
+)
 
-# =========================
+# ========================
+# PAGE
+# ========================
+
+st.set_page_config(
+    page_title="Bubbz AI",
+    page_icon="🧠",
+    layout="centered"
+)
+
+st.title("🧠 Bubbz AI")
+st.caption("Chat with your PDF using AI")
+
+# ========================
 # SESSION
-# =========================
+# ========================
 
 if "filename" not in st.session_state:
     st.session_state.filename = None
 
-# =========================
-# UPLOAD
-# =========================
+# ========================
+# PDF UPLOAD
+# ========================
 
 st.header("1. Upload PDF")
 
 file = st.file_uploader(
-    "Envie um PDF",
+    "Upload your PDF",
     type=["pdf"]
 )
 
-if file is not None:
+if file:
 
-    with st.spinner("Processando PDF..."):
+    with st.spinner("Processing PDF..."):
 
-        res = requests.post(
-            f"{API_URL}/upload",
-            files={
-                "file": (
-                    file.name,
-                    file.getvalue(),
-                    "application/pdf"
-                )
-            }
-        )
+        try:
 
-    data = res.json()
+            res = requests.post(
+                f"{API_URL}/upload",
+                files={
+                    "file": (
+                        file.name,
+                        file.getvalue(),
+                        "application/pdf"
+                    )
+                }
+            )
 
-    if "filename" in data:
+            data = res.json()
 
-        st.session_state.filename = data["filename"]
+            if "error" in data:
+                st.error(data["error"])
 
-        st.success("PDF processado 🚀")
+            else:
+                st.success("PDF uploaded successfully 🚀")
+                st.session_state.filename = data["filename"]
 
-    else:
+        except Exception as e:
+            st.error(f"Connection error: {str(e)}")
 
-        st.error(
-            data.get("error")
-        )
-
-# =========================
+# ========================
 # CHAT
-# =========================
-
-st.header("2. Pergunte ao PDF")
+# ========================
 
 if st.session_state.filename:
 
+    st.header("2. Chat with PDF")
+
     question = st.text_input(
-        "Digite sua pergunta"
+        "Ask a question:"
     )
 
     if question:
 
-        with st.spinner("Pensando..."):
+        with st.spinner("Generating answer..."):
 
-            res = requests.post(
-                f"{API_URL}/chat",
-                json={
-                    "filename":
-                    st.session_state.filename,
+            try:
 
-                    "question":
-                    question
-                }
-            )
+                res = requests.post(
+                    f"{API_URL}/chat",
+                    json={
+                        "filename": st.session_state.filename,
+                        "question": question
+                    }
+                )
 
-        data = res.json()
+                data = res.json()
 
-        if "answer" in data:
+                if "error" in data:
+                    st.error(data["error"])
 
-            st.subheader("Resposta")
+                else:
+                    st.subheader("Answer")
+                    st.write(data["answer"])
 
-            st.write(data["answer"])
-
-        else:
-
-            st.error(
-                data.get("error")
-            )
+            except Exception as e:
+                st.error(f"Connection error: {str(e)}")
 
 else:
-
-    st.info(
-        "Faça upload de um PDF primeiro"
-    )
+    st.info("Upload a PDF to start chatting.")
