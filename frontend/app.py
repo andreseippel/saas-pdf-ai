@@ -8,7 +8,7 @@ import os
 
 API_URL = os.getenv(
     "API_URL",
-    "http://127.0.0.1:8010"
+    "https://bubbz-pdf-ai.onrender.com"
 )
 
 # ========================
