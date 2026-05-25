@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+streamlit
+requests
+pymupdf
+faiss-cpu
+numpy
+sentence-transformers
+python-multipart
+groq
